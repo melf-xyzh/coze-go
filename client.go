@@ -101,21 +101,17 @@ func NewCozeAPI(auth Auth, opts ...CozeAPIOption) CozeAPI {
 	return cozeClient
 }
 
-type authTransport struct {
-	auth Auth
-	next http.RoundTripper
+type core struct {
+	*clientOption
 }
 
-func (h *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if isAuthContext(req.Context()) {
-		return h.next.RoundTrip(req)
+func newCore(opt *clientOption) *core {
+	if opt.client == nil {
+		opt.client = &http.Client{
+			Timeout: time.Second * 5,
+		}
 	}
-	accessToken, err := h.auth.Token(req.Context())
-	if err != nil {
-		logger.Errorf(req.Context(), "Failed to get access token: %v", err)
-		return nil, err
+	return &core{
+		clientOption: opt,
 	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	return h.next.RoundTrip(req)
 }

@@ -29,3 +29,5 @@ go.work.sum
 coverage.out
 integrations/
 debug/
+coverage.html
+test.mp3

@@ -5,100 +5,87 @@ import (
 	"net/http"
 )
 
-func (r *conversationsMessages) Create(ctx context.Context, req *CreateMessageReq) (*CreateMessageResp, error) {
-	method := http.MethodPost
-	uri := "/v1/conversation/message/create"
-	resp := &createMessageResp{}
-
-	err := r.core.Request(ctx, method, uri, req, resp,
-		withHTTPQuery("conversation_id", req.ConversationID))
-	if err != nil {
-		return nil, err
-	}
-	resp.Message.setHTTPResponse(resp.HTTPResponse)
-	return resp.Message, nil
-}
-
+// List 查看消息列表
+//
+// docs: https://www.coze.cn/open/docs/developer_guides/list_message
 func (r *conversationsMessages) List(ctx context.Context, req *ListConversationsMessagesReq) (LastIDPaged[Message], error) {
 	if req.Limit == 0 {
 		req.Limit = 20
 	}
-	return NewLastIDPaged[Message](
+	return NewLastIDPaged(
 		func(request *pageRequest) (*pageResponse[Message], error) {
-			uri := "/v1/conversation/message/list"
-			resp := &listConversationsMessagesResp{}
-			doReq := &ListConversationsMessagesReq{
-				Order:    req.Order,
-				ChatID:   req.ChatID,
-				BotID:    req.BotID,
-				BeforeID: req.BeforeID,
-				Limit:    request.PageSize,
-			}
-			if request.PageToken != "" {
-				doReq.AfterID = ptr(request.PageToken)
-			}
-			err := r.core.Request(ctx, http.MethodPost, uri, doReq, resp,
-				withHTTPQuery("conversation_id", req.ConversationID))
-			if err != nil {
+			response := new(listConversationsMessagesResp)
+			if err := r.core.rawRequest(ctx, &RawRequestReq{
+				Method: http.MethodPost,
+				URL:    "/v1/conversation/message/list",
+				Body:   req.toReq(request),
+			}, response); err != nil {
 				return nil, err
 			}
 			return &pageResponse[Message]{
-				HasMore: resp.HasMore,
-				Data:    resp.Messages,
-				LastID:  resp.FirstID,
-				NextID:  resp.LastID,
-				LogID:   resp.HTTPResponse.LogID(),
+				HasMore: response.HasMore,
+				Data:    response.Messages,
+				LastID:  response.FirstID,
+				NextID:  response.LastID,
+				LogID:   response.HTTPResponse.LogID(),
 			}, nil
 		}, req.Limit, req.AfterID)
 }
 
+// Create 创建消息
+//
+// https://www.coze.cn/open/docs/developer_guides/create_message
+func (r *conversationsMessages) Create(ctx context.Context, req *CreateMessageReq) (*CreateMessageResp, error) {
+	request := &RawRequestReq{
+		Method: http.MethodPost,
+		URL:    "/v1/conversation/message/create",
+		Body:   req,
+	}
+	response := new(createMessageResp)
+	err := r.core.rawRequest(ctx, request, response)
+	return response.Message, err
+}
+
+// Retrieve 查看消息详情
+//
+// docs: https://www.coze.cn/open/docs/developer_guides/retrieve_message
 func (r *conversationsMessages) Retrieve(ctx context.Context, req *RetrieveConversationsMessagesReq) (*RetrieveConversationsMessagesResp, error) {
-	method := http.MethodGet
-	uri := "/v1/conversation/message/retrieve"
-	resp := &retrieveConversationsMessagesResp{}
-	err := r.core.Request(ctx, method, uri, nil, resp,
-		withHTTPQuery("conversation_id", req.ConversationID),
-		withHTTPQuery("message_id", req.MessageID),
-	)
-	if err != nil {
-		return nil, err
+	request := &RawRequestReq{
+		Method: http.MethodGet,
+		URL:    "/v1/conversation/message/retrieve",
+		Body:   req,
 	}
-	resp.Message.setHTTPResponse(resp.HTTPResponse)
-	return resp.Message, nil
+	response := new(retrieveConversationsMessagesResp)
+	err := r.core.rawRequest(ctx, request, response)
+	return response.Message, err
 }
 
+// Update 修改消息
+//
+// docs: https://www.coze.cn/open/docs/developer_guides/modify_message
 func (r *conversationsMessages) Update(ctx context.Context, req *UpdateConversationMessagesReq) (*UpdateConversationMessagesResp, error) {
-	method := http.MethodPost
-	uri := "/v1/conversation/message/modify"
-	resp := &updateConversationMessagesResp{}
-	conversationID := req.ConversationID
-	messageID := req.MessageID
-	req.ConversationID = ""
-	req.MessageID = ""
-	err := r.core.Request(ctx, method, uri, req, resp,
-		withHTTPQuery("conversation_id", conversationID),
-		withHTTPQuery("message_id", messageID),
-	)
-	if err != nil {
-		return nil, err
+	request := &RawRequestReq{
+		Method: http.MethodPost,
+		URL:    "/v1/conversation/message/modify",
+		Body:   req,
 	}
-	resp.Message.setHTTPResponse(resp.HTTPResponse)
-	return resp.Message, nil
+	response := new(updateConversationMessagesResp)
+	err := r.core.rawRequest(ctx, request, response)
+	return response.Message, err
 }
 
+// Delete 删除消息
+//
+// docs: https://www.coze.cn/open/docs/developer_guides/delete_message
 func (r *conversationsMessages) Delete(ctx context.Context, req *DeleteConversationsMessagesReq) (*DeleteConversationsMessagesResp, error) {
-	method := http.MethodPost
-	uri := "/v1/conversation/message/delete"
-	resp := &deleteConversationsMessagesResp{}
-	err := r.core.Request(ctx, method, uri, nil, resp,
-		withHTTPQuery("conversation_id", req.ConversationID),
-		withHTTPQuery("message_id", req.MessageID),
-	)
-	if err != nil {
-		return nil, err
+	request := &RawRequestReq{
+		Method: http.MethodPost,
+		URL:    "/v1/conversation/message/delete",
+		Body:   req,
 	}
-	resp.Message.setHTTPResponse(resp.HTTPResponse)
-	return resp.Message, nil
+	response := new(deleteConversationsMessagesResp)
+	err := r.core.rawRequest(ctx, request, response)
+	return response.Message, err
 }
 
 type conversationsMessages struct {
@@ -112,7 +99,7 @@ func newConversationMessage(core *core) *conversationsMessages {
 // CreateMessageReq represents request for creating message
 type CreateMessageReq struct {
 	// The ID of the conversation.
-	ConversationID string `json:"-"`
+	ConversationID string `query:"conversation_id" json:"-"`
 
 	// The entity that sent this message.
 	Role MessageRole `json:"role"`
@@ -137,7 +124,7 @@ func (c *CreateMessageReq) SetObjectContext(objs []*MessageObjectString) {
 // ListConversationsMessagesReq represents request for listing messages
 type ListConversationsMessagesReq struct {
 	// The ID of the conversation.
-	ConversationID string `json:"-"`
+	ConversationID string `query:"conversation_id" json:"-"`
 
 	// The sorting method for the message list.
 	Order *string `json:"order,omitempty"`
@@ -157,19 +144,31 @@ type ListConversationsMessagesReq struct {
 	BotID *string `json:"bot_id,omitempty"`
 }
 
+func (r ListConversationsMessagesReq) toReq(page *pageRequest) *ListConversationsMessagesReq {
+	return &ListConversationsMessagesReq{
+		ConversationID: r.ConversationID,
+		Order:          r.Order,
+		ChatID:         r.ChatID,
+		BotID:          r.BotID,
+		BeforeID:       r.BeforeID,
+		AfterID:        ptrNotZero(page.PageToken),
+		Limit:          page.PageSize,
+	}
+}
+
 // RetrieveConversationsMessagesReq represents request for retrieving message
 type RetrieveConversationsMessagesReq struct {
-	ConversationID string `json:"conversation_id"`
-	MessageID      string `json:"message_id"`
+	ConversationID string `query:"conversation_id" json:"-"`
+	MessageID      string `query:"message_id" json:"-"`
 }
 
 // UpdateConversationMessagesReq represents request for updating message
 type UpdateConversationMessagesReq struct {
 	// The ID of the conversation.
-	ConversationID string `json:"conversation_id"`
+	ConversationID string `query:"conversation_id" json:"-"`
 
 	// The ID of the message.
-	MessageID string `json:"message_id"`
+	MessageID string `query:"message_id" json:"-"`
 
 	// The content of the message, supporting pure text, multimodal (mixed input of text, images, files),
 	// cards, and various types of content.
@@ -184,10 +183,10 @@ type UpdateConversationMessagesReq struct {
 // DeleteConversationsMessagesReq represents request for deleting message
 type DeleteConversationsMessagesReq struct {
 	// The ID of the conversation.
-	ConversationID string `json:"conversation_id"`
+	ConversationID string `query:"conversation_id" json:"-"`
 
 	// message id
-	MessageID string `json:"message_id"`
+	MessageID string `query:"message_id" json:"-"`
 }
 
 // createMessageResp represents response for creating message
