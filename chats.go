@@ -304,6 +304,16 @@ type CreateChatsReq struct {
 
 	// Optional: Support card response for question node
 	EnableCard *bool `json:"enable_card,omitempty"`
+	
+	// 指令相关
+	ShortcutCommand *ShortcutCommand `json:"shortcut_command,omitempty"`
+}
+
+type ShortcutCommand struct {
+	// 指令ID
+	CommandId string `json:"command_id"`
+	// 参数
+	Parameters map[string]any `json:"parameters"`
 }
 
 // CancelChatsReq represents the request to cancel a chat
